@@ -1,4 +1,4 @@
-# Napas Jakarta — Dashboard ISPU DKI Jakarta
+# Dashboard ISPU DKI Jakarta
 
 Dashboard interaktif Streamlit untuk dataset ISPU harian terbaru DKI Jakarta yang tersedia di portal Satu Data Jakarta. Aplikasi memisahkan dua DBMS dan melakukan federasi/join di tingkat aplikasi:
 
