@@ -17,43 +17,52 @@ Dashboard interaktif Streamlit untuk dataset ISPU harian terbaru DKI Jakarta yan
 
 ### Diagram alur
 
-```text
-Satu Data Jakarta (API ISPU terbaru)
-                 │
-                 ▼
-          Skrip ETL Python
-     validasi tanggal & normalisasi
-                 │
-                 ▼
- DBMS 1: Supabase PostgreSQL
- pengukuran ISPU harian
- tanggal, stasiun, PM2.5, PM10, CO, SO₂,
- NO₂, O₃, nilai maksimum, kategori,
- parameter kritis, periode data
-                 │
-                 │ SQLAlchemy + psycopg
-                 ▼
-          Pandas DataFrame ───────────────┐
-                                          │
- DBMS 2: SQLite                           │
- referensi stasiun & wilayah ── sqlite3 ──┤
- kategori ISPU & saran ──────── sqlite3 ──┘
-                      │
-                      ▼
-         Join/federasi di Pandas
-                      │
-                      ▼
-          Streamlit + Plotly
- filter, KPI, tren, kalender, perbandingan,
- peta, dan tabel data
+```mermaid
+  flowchart TB
+      api["Satu Data Jakarta<br/>API ISPU"]
+      etl["Skrip ETL Python<br/>Validasi tanggal dan normalisasi data"]
+  
+      subgraph storage["Lapisan penyimpanan data"]
+          direction LR
+  
+          supa[("DBMS 1 · Supabase PostgreSQL<br/>Pengukuran ISPU harian<br/>Tanggal · stasiun · PM2.5 · PM10 · CO · SO2 · NO2 · O3<br/>Nilai maksimum · kategori · parameter kritis · periode data")]
+  
+          sqlite[("DBMS 2 · SQLite<br/>Referensi stasiun dan wilayah<br/>Kategori ISPU dan saran")]
+      end
+  
+      frame["Pandas DataFrame"]
+      join["Join dan federasi data<br/>Dilakukan di Pandas"]
+  
+      app["Dashboard interaktif<br/>Streamlit + Plotly<br/>Filter · KPI · tren · kalender<br/>Perbandingan · peta · tabel data"]
+  
+      api --> etl
+      etl --> supa
+  
+      supa -->|"SQLAlchemy + psycopg"| frame
+      sqlite -->|"sqlite3"| frame
+  
+      frame --> join
+      join --> app
+  
+      classDef source fill:#EAF2FF,stroke:#3973C6,color:#17365D,stroke-width:1.5px
+      classDef process fill:#FFF4D6,stroke:#C58A00,color:#614500,stroke-width:1.5px
+      classDef database fill:#E7F5EC,stroke:#2F855A,color:#174A2E,stroke-width:1.5px
+      classDef analytics fill:#F2EAFE,stroke:#805AD5,color:#443078,stroke-width:1.5px
+      classDef output fill:#E6F6F7,stroke:#27838A,color:#164E52,stroke-width:1.5px
+  
+      class api source
+      class etl process
+      class supa,sqlite database
+      class frame,join analytics
+      class app output
 ```
-
+    
 ### Peran kedua DBMS
 
 | DBMS | Engine dan konektor | Data yang disimpan | Fungsi |
 |---|---|---|---|
-| **DBMS 1 — Supabase PostgreSQL** | PostgreSQL terkelola; SQLAlchemy dengan driver `psycopg` | Pengukuran ISPU per tanggal dan stasiun: PM₂.₅, PM₁₀, CO, SO₂, NO₂, O₃, nilai maksimum, kategori, parameter kritis, dan periode data | Menyimpan data pengukuran utama yang bertambah atau diperbarui dari sumber resmi. |
-| **DBMS 2 — SQLite** | SQLite embedded; konektor standar Python `sqlite3` | Referensi kode/nama stasiun, wilayah, koordinat perkiraan, kategori/rentang ISPU, saran umum, dan sumber referensi | Menyediakan data pendamping berukuran kecil yang stabil dan ikut dikemas bersama aplikasi. |
+| **Supabase PostgreSQL** | PostgreSQL terkelola; SQLAlchemy dengan driver `psycopg` | Pengukuran ISPU per tanggal dan stasiun: PM₂.₅, PM₁₀, CO, SO₂, NO₂, O₃, nilai maksimum, kategori, parameter kritis, dan periode data | Menyimpan data pengukuran utama yang bertambah atau diperbarui dari sumber resmi. |
+| **SQLite** | SQLite embedded; konektor standar Python `sqlite3` | Referensi kode/nama stasiun, wilayah, koordinat perkiraan, kategori/rentang ISPU, saran umum, dan sumber referensi | Menyediakan data pendamping berukuran kecil yang stabil dan ikut dikemas bersama aplikasi. |
 
 Kedua database tetap terpisah. PostgreSQL tidak melakukan foreign key ke SQLite; hubungan data dibentuk di lapisan aplikasi berdasarkan kode/nama stasiun dan label kategori.
 
