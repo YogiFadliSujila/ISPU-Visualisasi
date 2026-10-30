@@ -13,6 +13,67 @@ Dashboard interaktif Streamlit untuk dataset ISPU harian terbaru DKI Jakarta yan
 - Pratinjau CSV lokal opsional; berkas unggahan hanya diproses di sesi Streamlit dan tidak disimpan ke Supabase.
 - API publik resmi dan impor ulang data melalui CLI.
 
+## Ringkasan Arsitektur
+
+### Diagram alur
+
+```text
+Satu Data Jakarta (API ISPU terbaru)
+                 │
+                 ▼
+          Skrip ETL Python
+     validasi tanggal & normalisasi
+                 │
+                 ▼
+ DBMS 1: Supabase PostgreSQL
+ pengukuran ISPU harian
+ tanggal, stasiun, PM2.5, PM10, CO, SO₂,
+ NO₂, O₃, nilai maksimum, kategori,
+ parameter kritis, periode data
+                 │
+                 │ SQLAlchemy + psycopg
+                 ▼
+          Pandas DataFrame ───────────────┐
+                                          │
+ DBMS 2: SQLite                           │
+ referensi stasiun & wilayah ── sqlite3 ──┤
+ kategori ISPU & saran ──────── sqlite3 ──┘
+                      │
+                      ▼
+         Join/federasi di Pandas
+                      │
+                      ▼
+          Streamlit + Plotly
+ filter, KPI, tren, kalender, perbandingan,
+ peta, dan tabel data
+```
+
+### Peran kedua DBMS
+
+| DBMS | Engine dan konektor | Data yang disimpan | Fungsi |
+|---|---|---|---|
+| **DBMS 1 — Supabase PostgreSQL** | PostgreSQL terkelola; SQLAlchemy dengan driver `psycopg` | Pengukuran ISPU per tanggal dan stasiun: PM₂.₅, PM₁₀, CO, SO₂, NO₂, O₃, nilai maksimum, kategori, parameter kritis, dan periode data | Menyimpan data pengukuran utama yang bertambah atau diperbarui dari sumber resmi. |
+| **DBMS 2 — SQLite** | SQLite embedded; konektor standar Python `sqlite3` | Referensi kode/nama stasiun, wilayah, koordinat perkiraan, kategori/rentang ISPU, saran umum, dan sumber referensi | Menyediakan data pendamping berukuran kecil yang stabil dan ikut dikemas bersama aplikasi. |
+
+Kedua database tetap terpisah. PostgreSQL tidak melakukan foreign key ke SQLite; hubungan data dibentuk di lapisan aplikasi berdasarkan kode/nama stasiun dan label kategori.
+
+### Alur integrasi data
+
+1. ETL mengambil snapshot dari API resmi Satu Data Jakarta atau CSV yang diberikan pengguna.
+2. **Pandas** membersihkan kolom dan nilai, menyusun tanggal penuh dari `periode_data` dan nomor `tanggal` bila perlu, melewati tanggal kalender yang tidak valid, serta menghapus duplikat tanggal/stasiun.
+3. ETL menulis data pengukuran ke tabel `ispu_harian` di Supabase PostgreSQL menggunakan SQLAlchemy dan psycopg.
+4. Saat aplikasi berjalan, kueri PostgreSQL memuat pengukuran; `sqlite3` membaca referensi stasiun dan kategori dari SQLite.
+5. Modul federasi menggunakan `pandas.merge()` untuk mencocokkan pengukuran dengan referensi di memori aplikasi. Inilah penggabungan lintas-DBMS (data federation) pada tingkat aplikasi.
+6. Streamlit menyajikan hasil gabungan dalam grafik Plotly. Pengunggahan CSV di panel sidebar adalah jalur pratinjau alternatif dan tidak membaca pengukuran dari PostgreSQL untuk sesi tersebut.
+
+### Interaktivitas visualisasi
+
+- Filter rentang tanggal, stasiun, dan parameter pencemar.
+- Pilihan tahun untuk heatmap kalender.
+- Grafik tren harian Plotly dengan range slider dan tombol rentang waktu.
+- Gauge ISPU terbaru, perbandingan rata-rata antarestasiun, peta interaktif, ringkasan kategori, serta tabel hasil federasi.
+- Unggah CSV untuk pratinjau lokal jika koneksi PostgreSQL belum dikonfigurasi.
+
 ## Menjalankan dashboard
 
 1. Gunakan Python 3.10+ dan pasang dependensi:
